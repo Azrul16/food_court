@@ -14,7 +14,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _fullName = '';
   String _email = '';
   String _mobile = '';
-  String _password = '';
   String _newPassword = '';
 
   final User? user = FirebaseAuth.instance.currentUser;
@@ -27,31 +26,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadUserData() async {
     if (user == null) return;
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
     try {
-      DocumentSnapshot userDoc =
+      DocumentSnapshot doc =
           await FirebaseFirestore.instance
               .collection('users')
               .doc(user!.uid)
               .get();
-      if (userDoc.exists) {
-        final data = userDoc.data() as Map<String, dynamic>;
+      if (doc.exists) {
+        final data = doc.data() as Map<String, dynamic>;
         setState(() {
           _fullName = data['fullName'] ?? '';
           _email = data['email'] ?? '';
           _mobile = data['mobile'] ?? '';
         });
       }
-    } catch (e) {
+    } catch (_) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed to load user data')));
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
@@ -59,23 +54,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (!_formKey.currentState!.validate()) return;
     _formKey.currentState!.save();
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
-      // Update Firestore user data
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user!.uid)
           .update({'fullName': _fullName, 'mobile': _mobile, 'email': _email});
 
-      // Update email in Firebase Auth if changed
       if (_email != user!.email) {
         await user!.updateEmail(_email);
       }
 
-      // Update password if new password provided
       if (_newPassword.isNotEmpty) {
         await user!.updatePassword(_newPassword);
       }
@@ -83,10 +73,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Profile updated successfully')));
-    } catch (e) {
+    } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to update profile: $e')));
+      ).showSnackBar(SnackBar(content: Text('Error: ${e.message}')));
     } finally {
       setState(() {
         _isLoading = false;
@@ -95,192 +85,192 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _logout() async {
+    await FirebaseAuth.instance.signOut();
+    // Clear user session, then navigate to login screen removing all previous routes
+    Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
+  }
+
+  Widget _buildAvatar() {
+    String displayLetter =
+        _fullName.isNotEmpty ? _fullName[0].toUpperCase() : '';
+    return CircleAvatar(
+      radius: 48,
+      backgroundColor: Colors.tealAccent,
+      child:
+          displayLetter.isNotEmpty
+              ? Text(
+                displayLetter,
+                style: TextStyle(
+                  fontSize: 48,
+                  color: Colors.black87,
+                  fontWeight: FontWeight.bold,
+                ),
+              )
+              : Icon(Icons.person, size: 48, color: Colors.black54),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (user == null) {
-      return Scaffold(
-        backgroundColor: Colors.black,
-        appBar: AppBar(
-          title: Text('Profile', style: TextStyle(color: Colors.white)),
-          backgroundColor: Colors.black,
-          iconTheme: IconThemeData(color: Colors.white),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Please login to view profile',
-                style: TextStyle(color: Colors.white, fontSize: 18),
-              ),
-              SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () => Navigator.pushNamed(context, '/login'),
-                child: Text('Login', style: TextStyle(fontSize: 16)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue[800],
-                  padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        title: Text('Profile', style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.black,
+        title: Text('My Profile', style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         iconTheme: IconThemeData(color: Colors.white),
       ),
       body:
           _isLoading
-              ? Center(child: CircularProgressIndicator())
+              ? Center(
+                child: CircularProgressIndicator(color: Colors.tealAccent),
+              )
+              : user == null
+              ? _buildLoginPrompt()
               : Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.all(20),
                 child: Form(
                   key: _formKey,
                   child: ListView(
                     children: [
-                      TextFormField(
+                      Center(child: _buildAvatar()),
+                      SizedBox(height: 24),
+                      _buildTextField(
+                        label: 'Full Name',
                         initialValue: _fullName,
-                        style: TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          labelText: 'Full Name',
-                          labelStyle: TextStyle(color: Colors.grey[400]),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.grey[700]!),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.grey[700]!),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.blue),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[900],
-                        ),
+                        onSaved: (val) => _fullName = val!,
                         validator:
-                            (value) =>
-                                value == null || value.isEmpty
-                                    ? 'Enter full name'
+                            (val) =>
+                                val == null || val.isEmpty
+                                    ? 'Enter your name'
                                     : null,
-                        onSaved: (value) => _fullName = value!.trim(),
                       ),
-                      SizedBox(height: 12),
-                      TextFormField(
+                      SizedBox(height: 14),
+                      _buildTextField(
+                        label: 'Email',
                         initialValue: _email,
-                        style: TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          labelText: 'Email',
-                          labelStyle: TextStyle(color: Colors.grey[400]),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.grey[700]!),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.grey[700]!),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.blue),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[900],
-                        ),
                         keyboardType: TextInputType.emailAddress,
+                        onSaved: (val) => _email = val!,
                         validator:
-                            (value) =>
-                                value == null || !value.contains('@')
-                                    ? 'Enter valid email'
+                            (val) =>
+                                val == null || !val.contains('@')
+                                    ? 'Enter a valid email'
                                     : null,
-                        onSaved: (value) => _email = value!.trim(),
                       ),
-                      SizedBox(height: 12),
-                      TextFormField(
+                      SizedBox(height: 14),
+                      _buildTextField(
+                        label: 'Mobile',
                         initialValue: _mobile,
-                        style: TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          labelText: 'Mobile',
-                          labelStyle: TextStyle(color: Colors.grey[400]),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.grey[700]!),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.grey[700]!),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.blue),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[900],
-                        ),
                         keyboardType: TextInputType.phone,
+                        onSaved: (val) => _mobile = val!,
                         validator:
-                            (value) =>
-                                value == null || value.isEmpty
-                                    ? 'Enter mobile number'
+                            (val) =>
+                                val == null || val.length < 6
+                                    ? 'Enter a valid mobile number'
                                     : null,
-                        onSaved: (value) => _mobile = value!.trim(),
                       ),
-                      SizedBox(height: 12),
-                      TextFormField(
-                        style: TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          labelText: 'New Password',
-                          labelStyle: TextStyle(color: Colors.grey[400]),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.grey[700]!),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.grey[700]!),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide(color: Colors.blue),
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey[900],
-                        ),
+                      SizedBox(height: 14),
+                      _buildTextField(
+                        label: 'New Password',
+                        hintText: 'Leave empty if no change',
                         obscureText: true,
-                        validator: (value) {
-                          if (value != null &&
-                              value.isNotEmpty &&
-                              value.length < 6) {
+                        onSaved: (val) => _newPassword = val ?? '',
+                        validator: (val) {
+                          if (val != null && val.isNotEmpty && val.length < 6) {
                             return 'Password must be at least 6 characters';
                           }
                           return null;
                         },
-                        onSaved: (value) => _newPassword = value ?? '',
                       ),
-                      SizedBox(height: 20),
-                      ElevatedButton(
+                      SizedBox(height: 24),
+                      ElevatedButton.icon(
                         onPressed: _updateProfile,
-                        child: Text(
-                          'Save Changes',
-                          style: TextStyle(color: Colors.white),
-                        ),
+                        icon: Icon(Icons.save),
+                        label: Text('Save Changes'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue[800],
+                          backgroundColor: Colors.teal,
                           padding: EdgeInsets.symmetric(vertical: 14),
-                          textStyle: TextStyle(fontSize: 16),
+                        ),
+                      ),
+                      SizedBox(height: 12),
+                      ElevatedButton.icon(
+                        onPressed: _logout,
+                        icon: Icon(Icons.logout),
+                        label: Text('Logout'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.redAccent,
+                          padding: EdgeInsets.symmetric(vertical: 14),
                         ),
                       ),
                     ],
                   ),
                 ),
               ),
+    );
+  }
+
+  Widget _buildLoginPrompt() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.person_outline, color: Colors.white54, size: 60),
+            SizedBox(height: 12),
+            Text(
+              'Please login to view your profile',
+              style: TextStyle(color: Colors.white, fontSize: 16),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () => Navigator.pushNamed(context, '/login'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal,
+                padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+              ),
+              child: Text('Go to Login'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required String label,
+    String? hintText,
+    String? initialValue,
+    bool obscureText = false,
+    TextInputType keyboardType = TextInputType.text,
+    required void Function(String?) onSaved,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      style: TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hintText,
+        hintStyle: TextStyle(color: Colors.grey),
+        labelStyle: TextStyle(color: Colors.grey[300]),
+        filled: true,
+        fillColor: Colors.grey[900],
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey[800]!),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.tealAccent),
+        ),
+      ),
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      initialValue: initialValue,
+      onSaved: onSaved,
+      validator: validator,
     );
   }
 }

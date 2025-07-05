@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:food_court/admin/admin_main_screen.dart';
+import 'package:food_court/screens/forgot_pass.dart';
+import 'package:food_court/screens/home_page.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -17,120 +19,179 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
     _formKey.currentState!.save();
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
-    // Hardcoded admin check
-    if (_email == 'admin@gmail.com' && _password == '@admin123') {
+    // Admin hardcoded login
+    if (_email.trim() == 'admin@gmail.com' && _password == 'admin123') {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Admin login successful')));
-      Navigator.pushReplacementNamed(context, '/admin_dashboard');
-      setState(() {
-        _isLoading = false;
-      });
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => AdminMainScreen()),
+      );
+
+      setState(() => _isLoading = false);
       return;
     }
 
     try {
-      // Firebase Auth login
-      UserCredential userCredential = await FirebaseAuth.instance
-          .signInWithEmailAndPassword(email: _email, password: _password);
-
-      // Fetch user role from Firestore
-      DocumentSnapshot userDoc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(userCredential.user!.uid)
-              .get();
-
-      String role = userDoc.get('role') ?? 'user';
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: _email,
+        password: _password,
+      );
 
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Login successful')));
 
-      if (role == 'admin') {
-        Navigator.pushReplacementNamed(context, '/admin_dashboard');
-      } else {
-        Navigator.pushReplacementNamed(context, '/home');
-      }
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => HomePage()),
+      );
     } on FirebaseAuthException catch (e) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Login failed: ${e.message}')));
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Login')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child:
-            _isLoading
-                ? Center(child: CircularProgressIndicator())
-                : Form(
-                  key: _formKey,
-                  child: ListView(
-                    children: [
-                      TextFormField(
-                        decoration: InputDecoration(
-                          labelText: 'Email',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF0f2027), Color(0xFF203a43), Color(0xFF2c5364)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child:
+                _isLoading
+                    ? CircularProgressIndicator(color: Colors.white)
+                    : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.fastfood, size: 64, color: Colors.white),
+                        SizedBox(height: 12),
+                        Text(
+                          'Food Court',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: 1.2,
                           ),
                         ),
-                        keyboardType: TextInputType.emailAddress,
-                        validator:
-                            (value) =>
-                                value == null ||
-                                        value.isEmpty ||
-                                        !value.contains('@')
-                                    ? 'Enter valid email'
-                                    : null,
-                        onSaved: (value) => _email = value!.trim(),
-                      ),
-                      SizedBox(height: 12),
-                      TextFormField(
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
+                        SizedBox(height: 30),
+                        Card(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 8,
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Form(
+                              key: _formKey,
+                              child: Column(
+                                children: [
+                                  TextFormField(
+                                    decoration: InputDecoration(
+                                      labelText: 'Email',
+                                      prefixIcon: Icon(Icons.email),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    keyboardType: TextInputType.emailAddress,
+                                    validator:
+                                        (value) =>
+                                            value == null ||
+                                                    value.isEmpty ||
+                                                    !value.contains('@')
+                                                ? 'Enter a valid email'
+                                                : null,
+                                    onSaved: (value) => _email = value!.trim(),
+                                  ),
+                                  SizedBox(height: 16),
+                                  TextFormField(
+                                    decoration: InputDecoration(
+                                      labelText: 'Password',
+                                      prefixIcon: Icon(Icons.lock),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    obscureText: true,
+                                    validator:
+                                        (value) =>
+                                            value == null || value.length < 6
+                                                ? 'Password must be at least 6 characters'
+                                                : null,
+                                    onSaved: (value) => _password = value!,
+                                  ),
+                                  SizedBox(height: 24),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      onPressed: _login,
+                                      child: Text('Login'),
+                                      style: ElevatedButton.styleFrom(
+                                        padding: EdgeInsets.symmetric(
+                                          vertical: 14,
+                                        ),
+                                        backgroundColor: Colors.teal,
+                                        textStyle: TextStyle(fontSize: 16),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(height: 12),
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder:
+                                              (_) => ForgotPasswordScreen(),
+                                        ),
+                                      );
+                                    },
+                                    child: Text(
+                                      "Forget your password?",
+                                      style: TextStyle(color: Colors.teal[100]),
+                                    ),
+                                  ),
+                                  SizedBox(height: 12),
+                                  TextButton(
+                                    onPressed: () {
+                                      Navigator.pushNamed(context, '/register');
+                                    },
+                                    child: Text(
+                                      "Don't have an account? Register",
+                                      style: TextStyle(color: Colors.teal[100]),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                        obscureText: true,
-                        validator:
-                            (value) =>
-                                value == null || value.length < 6
-                                    ? 'Password must be at least 6 characters'
-                                    : null,
-                        onSaved: (value) => _password = value!,
-                      ),
-                      SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: _login,
-                        child: Text('Login'),
-                        style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(vertical: 14),
-                          textStyle: TextStyle(fontSize: 16),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/register');
-                        },
-                        child: Text('Don\'t have an account? Register'),
-                      ),
-                    ],
-                  ),
-                ),
+                      ],
+                    ),
+          ),
+        ),
       ),
     );
   }

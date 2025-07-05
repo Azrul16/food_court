@@ -1,20 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:food_court/admin/admin_add_food_screen.dart';
-import 'package:food_court/admin/admin_add_restaurant_screen.dart';
+import 'package:food_court/providers/cart_provider.dart';
+import 'package:food_court/screens/home_page.dart';
 import 'package:food_court/screens/login_screen.dart';
-import 'package:food_court/screens/order_screen.dart';
 import 'package:food_court/screens/registration_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
-
-import 'screens/home_screen.dart';
-import 'screens/orders_screen.dart';
 import 'screens/user_orders_screen.dart';
-import 'admin/admin_orders_screen.dart';
-import 'screens/profile_screen.dart';
-import 'admin/admin_login_screen.dart';
-import 'admin/admin_dashboard_screen.dart';
 import 'services/firebase_service.dart';
 
 class OnlineFoodOrderingApp extends StatefulWidget {
@@ -38,7 +30,10 @@ class _OnlineFoodOrderingAppState extends State<OnlineFoodOrderingApp> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.done) {
           return MultiProvider(
-            providers: [Provider(create: (_) => FirebaseService())],
+            providers: [
+              Provider(create: (_) => FirebaseService()),
+              ChangeNotifierProvider(create: (_) => CartProvider()),
+            ],
             child: MaterialApp(
               title: 'Online Food Ordering',
               theme: ThemeData(
@@ -61,19 +56,14 @@ class _OnlineFoodOrderingAppState extends State<OnlineFoodOrderingApp> {
                   unselectedItemColor: Colors.grey,
                 ),
               ),
-              initialRoute: '/',
+              initialRoute: '/login',
               routes: {
-                '/': (context) => MainScreen(),
                 '/login': (context) => LoginScreen(),
-                '/order': (context) => OrderScreen(),
+                '/home': (context) => HomePage(),
+
                 '/register': (context) => RegistrationScreen(),
-                '/admin_login': (context) => AdminLoginScreen(),
-                '/admin_dashboard': (context) => AdminDashboardScreen(),
-                '/admin_add_restaurant':
-                    (context) => AdminAddRestaurantScreen(),
-                '/admin_add_food': (context) => AdminAddFoodScreen(),
+
                 '/user_orders': (context) => UserOrdersScreen(),
-                '/admin_orders': (context) => AdminOrdersScreen(),
               },
             ),
           );
@@ -101,11 +91,7 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
 
-  static final List<Widget> _screens = <Widget>[
-    HomeScreen(),
-    UserOrdersScreen(),
-    ProfileScreen(),
-  ];
+  static final List<Widget> _screens = <Widget>[];
 
   void _onItemTapped(int index) {
     setState(() {
